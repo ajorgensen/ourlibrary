@@ -43,14 +43,14 @@ func Home(user store.User, library *store.Library, books []store.Book) templ.Com
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: false }\" x-on:book-created.window=\"open = false; $refs.form.reset(); $refs.form.querySelectorAll('input').forEach(input => input.value = ''); $refs.form.querySelector('[data-book-lookup-message]')?.remove(); $dispatch('close-isbn-scanner')\"><header class=\"border-b border-base-300 bg-base-100\"><div class=\"navbar mx-auto max-w-6xl px-4 sm:px-6\"><div class=\"flex-1\"><a class=\"text-xl font-bold\" href=\"/\">Our Library</a></div><div class=\"flex items-center gap-3\"><span class=\"hidden text-sm text-base-content/65 sm:inline\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: false }\" x-on:book-created.window=\"open = false; $refs.form.reset(); $refs.form.querySelectorAll('input').forEach(input => input.value = ''); $refs.form.querySelector('[data-book-lookup-message]')?.remove(); $dispatch('close-isbn-scanner')\"><header class=\"border-b border-base-300 bg-base-100\"><div class=\"navbar mx-auto max-w-6xl px-4 sm:px-6\"><div class=\"flex-1\"><a class=\"inline-flex items-center gap-2 text-xl font-bold\" href=\"/\"><img class=\"h-10 w-10\" src=\"/assets/images/our-library-mark.png\" width=\"40\" height=\"40\" alt=\"\"> <span>Our Library</span></a></div><div class=\"flex items-center gap-3\"><span class=\"hidden text-sm text-base-content/65 sm:inline\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 14, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 17, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -83,7 +83,7 @@ func Home(user store.User, library *store.Library, books []store.Book) templ.Com
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(library.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 33, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 36, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -168,7 +168,7 @@ func BookFields(title string, author string, message string, found bool) templ.C
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 139, Col: 98}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 142, Col: 98}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -186,7 +186,7 @@ func BookFields(title string, author string, message string, found bool) templ.C
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 141, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 144, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -205,7 +205,7 @@ func BookFields(title string, author string, message string, found bool) templ.C
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 146, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 149, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -218,7 +218,7 @@ func BookFields(title string, author string, message string, found bool) templ.C
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(author)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 150, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 153, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -271,7 +271,7 @@ func BookList(books []store.Book) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(book.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 166, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 169, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -284,7 +284,7 @@ func BookList(books []store.Book) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(book.Author)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 167, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 170, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -332,7 +332,7 @@ func FormError(message string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 176, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 179, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
