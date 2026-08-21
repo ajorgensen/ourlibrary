@@ -21,13 +21,15 @@ You need Go, Node.js, Docker, and [`just`](https://just.systems/).
 cp .env.example .env
 just setup
 just db-up
-just migrate
+just seed
 just dev
 ```
 
+Log in with the seeded local-development account, `dev@example.com`.
+
 Open Air's live-reload proxy at <http://localhost:8090>. The application remains available directly at <http://localhost:8080>, with service health at <http://localhost:8080/healthz>.
 
-The defaults use ports `8080` and `5432`. If either port is in use, update `HTTP_ADDRESS`, `POSTGRES_PORT`, and the port in `DATABASE_URL` in `.env`. When you change the application port, also update `proxy.app_port` in `.air.toml`.
+The defaults use ports `8080` and `55432`. If either port is in use, update `HTTP_ADDRESS`, `POSTGRES_PORT`, and the port in `DATABASE_URL` in `.env`. When you change the application port, also update `proxy.app_port` in `.air.toml`.
 
 ## Common commands
 
@@ -41,6 +43,8 @@ just build           # build bin/ourlibrary
 just db-up            # start PostgreSQL
 just db-down          # stop PostgreSQL
 just migrate          # apply migrations
+just seed             # migrate and add local development data
+just user-add me@example.com
 just new-migration add_members
 ```
 
@@ -49,9 +53,11 @@ During `just dev`, Air regenerates sqlc, Templ, and Tailwind output when their s
 ## Project layout
 
 ```text
-cmd/server/                     application entry point
+cmd/server/                     server application entry point
+cmd/user/                       user administration CLI
 internal/config/                environment configuration
 internal/database/migrations/   Goose migrations
+internal/database/seeds/        idempotent development seeds
 internal/database/queries/      sqlc queries
 internal/database/store/        generated sqlc package
 internal/web/                    HTTP handlers and embedded assets

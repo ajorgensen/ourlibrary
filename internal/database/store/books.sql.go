@@ -7,39 +7,44 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createBook = `-- name: CreateBook :one
-INSERT INTO books (title, author)
-VALUES ($1, $2)
-RETURNING id, title, author, created_at
+INSERT INTO books (library_id, title, author)
+VALUES ($1, $2, $3)
+RETURNING id, title, author, created_at, library_id
 `
 
 type CreateBookParams struct {
-	Title  string `json:"title"`
-	Author string `json:"author"`
+	LibraryID pgtype.UUID `json:"library_id"`
+	Title     string      `json:"title"`
+	Author    string      `json:"author"`
 }
 
 func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, error) {
-	row := q.db.QueryRow(ctx, createBook, arg.Title, arg.Author)
+	row := q.db.QueryRow(ctx, createBook, arg.LibraryID, arg.Title, arg.Author)
 	var i Book
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
 		&i.Author,
 		&i.CreatedAt,
+		&i.LibraryID,
 	)
 	return i, err
 }
 
 const listBooks = `-- name: ListBooks :many
-SELECT id, title, author, created_at
+SELECT id, title, author, created_at, library_id
 FROM books
+WHERE library_id = $1
 ORDER BY created_at DESC, id DESC
 `
 
-func (q *Queries) ListBooks(ctx context.Context) ([]Book, error) {
-	rows, err := q.db.Query(ctx, listBooks)
+func (q *Queries) ListBooks(ctx context.Context, libraryID pgtype.UUID) ([]Book, error) {
+	rows, err := q.db.Query(ctx, listBooks, libraryID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +57,7 @@ func (q *Queries) ListBooks(ctx context.Context) ([]Book, error) {
 			&i.Title,
 			&i.Author,
 			&i.CreatedAt,
+			&i.LibraryID,
 		); err != nil {
 			return nil, err
 		}

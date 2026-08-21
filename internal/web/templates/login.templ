@@ -1,0 +1,33 @@
+package templates
+
+templ Login(email string, message string) {
+	@Layout("Log in · Our Library") {
+		<main class="flex min-h-screen items-center justify-center px-4 py-12">
+			<div class="card w-full max-w-md border border-base-300 bg-base-100 shadow-xl">
+				<form class="card-body" method="post" action="/login">
+					<p class="text-sm font-semibold uppercase tracking-widest text-primary">Our Library</p>
+					<h1 class="card-title text-3xl">Log in</h1>
+					<p class="text-base-content/65">Enter the email address for your account.</p>
+					<label class="form-control mt-3">
+						<span class="label-text mb-2 font-medium">Email address</span>
+						<input
+							class="input input-bordered w-full"
+							type="email"
+							name="email"
+							value={ email }
+							autocomplete="email"
+							required
+							autofocus
+						/>
+					</label>
+					if message != "" {
+						<p class="text-sm text-error" role="alert">{ message }</p>
+					}
+					<div class="card-actions mt-2">
+						<button class="btn btn-primary w-full" type="submit">Log in</button>
+					</div>
+				</form>
+			</div>
+		</main>
+	}
+}

@@ -9,8 +9,36 @@ import (
 )
 
 type Book struct {
-	ID        int64              `json:"id"`
+	ID        pgtype.UUID        `json:"id"`
 	Title     string             `json:"title"`
 	Author    string             `json:"author"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	LibraryID pgtype.UUID        `json:"library_id"`
+}
+
+type Library struct {
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Session struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	TokenHash  []byte             `json:"token_hash"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+}
+
+type User struct {
+	ID        pgtype.UUID        `json:"id"`
+	Email     string             `json:"email"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type UserLibrary struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	LibraryID pgtype.UUID        `json:"library_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
