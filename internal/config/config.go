@@ -6,18 +6,20 @@ import (
 )
 
 type Config struct {
-	HTTPAddress       string
-	DatabaseURL       string
-	ReadHeaderTimeout time.Duration
-	ShutdownTimeout   time.Duration
+	HTTPAddress        string
+	DatabaseURL        string
+	OpenLibraryContact string
+	ReadHeaderTimeout  time.Duration
+	ShutdownTimeout    time.Duration
 }
 
 func Load() Config {
 	return Config{
-		HTTPAddress:       envOrDefault("HTTP_ADDRESS", ":8080"),
-		DatabaseURL:       envOrDefault("DATABASE_URL", "postgres://ourlibrary:ourlibrary@localhost:55432/ourlibrary?sslmode=disable"),
-		ReadHeaderTimeout: 5 * time.Second,
-		ShutdownTimeout:   10 * time.Second,
+		HTTPAddress:        envOrDefault("HTTP_ADDRESS", ":8080"),
+		DatabaseURL:        envOrDefault("DATABASE_URL", "postgres://ourlibrary:ourlibrary@localhost:55432/ourlibrary?sslmode=disable"),
+		OpenLibraryContact: os.Getenv("OPEN_LIBRARY_CONTACT"),
+		ReadHeaderTimeout:  5 * time.Second,
+		ShutdownTimeout:    10 * time.Second,
 	}
 }
 

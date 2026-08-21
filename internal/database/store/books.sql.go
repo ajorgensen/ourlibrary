@@ -11,53 +11,247 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createBook = `-- name: CreateBook :one
-INSERT INTO books (library_id, title, author)
+const addBookIdentifier = `-- name: AddBookIdentifier :exec
+INSERT INTO book_identifiers (kind, value, book_id)
 VALUES ($1, $2, $3)
-RETURNING id, title, author, created_at, library_id
+ON CONFLICT (kind, value) DO UPDATE SET book_id = EXCLUDED.book_id
 `
 
-type CreateBookParams struct {
-	LibraryID pgtype.UUID `json:"library_id"`
-	Title     string      `json:"title"`
-	Author    string      `json:"author"`
+type AddBookIdentifierParams struct {
+	Kind   string      `json:"kind"`
+	Value  string      `json:"value"`
+	BookID pgtype.UUID `json:"book_id"`
 }
 
-func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, error) {
-	row := q.db.QueryRow(ctx, createBook, arg.LibraryID, arg.Title, arg.Author)
-	var i Book
+func (q *Queries) AddBookIdentifier(ctx context.Context, arg AddBookIdentifierParams) error {
+	_, err := q.db.Exec(ctx, addBookIdentifier, arg.Kind, arg.Value, arg.BookID)
+	return err
+}
+
+const addBookToLibrary = `-- name: AddBookToLibrary :exec
+INSERT INTO library_books (library_id, book_id, added_by_user_id, title_override, author_override)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (library_id, book_id) DO UPDATE SET
+    title_override = EXCLUDED.title_override,
+    author_override = EXCLUDED.author_override
+`
+
+type AddBookToLibraryParams struct {
+	LibraryID      pgtype.UUID `json:"library_id"`
+	BookID         pgtype.UUID `json:"book_id"`
+	AddedByUserID  pgtype.UUID `json:"added_by_user_id"`
+	TitleOverride  pgtype.Text `json:"title_override"`
+	AuthorOverride pgtype.Text `json:"author_override"`
+}
+
+func (q *Queries) AddBookToLibrary(ctx context.Context, arg AddBookToLibraryParams) error {
+	_, err := q.db.Exec(ctx, addBookToLibrary,
+		arg.LibraryID,
+		arg.BookID,
+		arg.AddedByUserID,
+		arg.TitleOverride,
+		arg.AuthorOverride,
+	)
+	return err
+}
+
+const createManualAuthor = `-- name: CreateManualAuthor :one
+INSERT INTO authors (name)
+VALUES ($1)
+RETURNING id, open_library_author_key, name, bio, birth_date, death_date, metadata_synced_at, works_synced_at, created_at
+`
+
+func (q *Queries) CreateManualAuthor(ctx context.Context, name string) (Author, error) {
+	row := q.db.QueryRow(ctx, createManualAuthor, name)
+	var i Author
 	err := row.Scan(
 		&i.ID,
-		&i.Title,
-		&i.Author,
+		&i.OpenLibraryAuthorKey,
+		&i.Name,
+		&i.Bio,
+		&i.BirthDate,
+		&i.DeathDate,
+		&i.MetadataSyncedAt,
+		&i.WorksSyncedAt,
 		&i.CreatedAt,
-		&i.LibraryID,
 	)
 	return i, err
 }
 
-const listBooks = `-- name: ListBooks :many
-SELECT id, title, author, created_at, library_id
-FROM books
-WHERE library_id = $1
-ORDER BY created_at DESC, id DESC
+const createManualBook = `-- name: CreateManualBook :one
+INSERT INTO books (title)
+VALUES ($1)
+RETURNING id, title, created_at, open_library_work_key, subtitle, cover_id, first_publish_year, metadata_updated_at
 `
 
-func (q *Queries) ListBooks(ctx context.Context, libraryID pgtype.UUID) ([]Book, error) {
+func (q *Queries) CreateManualBook(ctx context.Context, title string) (Book, error) {
+	row := q.db.QueryRow(ctx, createManualBook, title)
+	var i Book
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.CreatedAt,
+		&i.OpenLibraryWorkKey,
+		&i.Subtitle,
+		&i.CoverID,
+		&i.FirstPublishYear,
+		&i.MetadataUpdatedAt,
+	)
+	return i, err
+}
+
+const getBook = `-- name: GetBook :one
+SELECT
+    books.id,
+    COALESCE(library_books.title_override, books.title)::text AS title,
+    books.subtitle,
+    books.cover_id,
+    books.first_publish_year,
+    books.open_library_work_key,
+    CASE WHEN library_books.book_id IS NULL THEN false ELSE true END AS in_library,
+    library_books.author_override,
+    COALESCE(
+        (SELECT array_agg(authors.name ORDER BY book_authors.position, authors.id)
+         FROM book_authors
+         JOIN authors ON authors.id = book_authors.author_id
+         WHERE book_authors.book_id = books.id),
+        ARRAY[]::text[]
+    )::text[] AS author_names,
+    COALESCE(
+        (SELECT array_agg(COALESCE(authors.open_library_author_key, '') ORDER BY book_authors.position, authors.id)
+         FROM book_authors
+         JOIN authors ON authors.id = book_authors.author_id
+         WHERE book_authors.book_id = books.id),
+        ARRAY[]::text[]
+    )::text[] AS author_keys,
+    COALESCE(
+        (SELECT array_agg(book_identifiers.value ORDER BY book_identifiers.value)
+         FROM book_identifiers
+         WHERE book_identifiers.book_id = books.id
+           AND book_identifiers.kind = 'isbn'),
+        ARRAY[]::text[]
+    )::text[] AS isbns
+FROM books
+LEFT JOIN library_books
+    ON library_books.book_id = books.id
+   AND library_books.library_id = $2
+WHERE books.id = $1
+`
+
+type GetBookParams struct {
+	ID        pgtype.UUID `json:"id"`
+	LibraryID pgtype.UUID `json:"library_id"`
+}
+
+type GetBookRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	Title              string      `json:"title"`
+	Subtitle           pgtype.Text `json:"subtitle"`
+	CoverID            pgtype.Int8 `json:"cover_id"`
+	FirstPublishYear   pgtype.Int4 `json:"first_publish_year"`
+	OpenLibraryWorkKey pgtype.Text `json:"open_library_work_key"`
+	InLibrary          bool        `json:"in_library"`
+	AuthorOverride     pgtype.Text `json:"author_override"`
+	AuthorNames        []string    `json:"author_names"`
+	AuthorKeys         []string    `json:"author_keys"`
+	Isbns              []string    `json:"isbns"`
+}
+
+func (q *Queries) GetBook(ctx context.Context, arg GetBookParams) (GetBookRow, error) {
+	row := q.db.QueryRow(ctx, getBook, arg.ID, arg.LibraryID)
+	var i GetBookRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Subtitle,
+		&i.CoverID,
+		&i.FirstPublishYear,
+		&i.OpenLibraryWorkKey,
+		&i.InLibrary,
+		&i.AuthorOverride,
+		&i.AuthorNames,
+		&i.AuthorKeys,
+		&i.Isbns,
+	)
+	return i, err
+}
+
+const linkBookAuthor = `-- name: LinkBookAuthor :exec
+INSERT INTO book_authors (book_id, author_id, position)
+VALUES ($1, $2, $3)
+ON CONFLICT (book_id, author_id) DO UPDATE SET position = EXCLUDED.position
+`
+
+type LinkBookAuthorParams struct {
+	BookID   pgtype.UUID `json:"book_id"`
+	AuthorID pgtype.UUID `json:"author_id"`
+	Position int32       `json:"position"`
+}
+
+func (q *Queries) LinkBookAuthor(ctx context.Context, arg LinkBookAuthorParams) error {
+	_, err := q.db.Exec(ctx, linkBookAuthor, arg.BookID, arg.AuthorID, arg.Position)
+	return err
+}
+
+const listBooks = `-- name: ListBooks :many
+SELECT
+    books.id,
+    COALESCE(library_books.title_override, books.title)::text AS title,
+    books.subtitle,
+    books.cover_id,
+    books.first_publish_year,
+    library_books.added_at,
+    library_books.author_override,
+    COALESCE(
+        array_agg(authors.name ORDER BY book_authors.position, authors.id)
+            FILTER (WHERE authors.id IS NOT NULL),
+        ARRAY[]::text[]
+    )::text[] AS author_names_list,
+    COALESCE(
+        array_agg(COALESCE(authors.open_library_author_key, '') ORDER BY book_authors.position, authors.id)
+            FILTER (WHERE authors.id IS NOT NULL),
+        ARRAY[]::text[]
+    )::text[] AS author_keys
+FROM library_books
+JOIN books ON books.id = library_books.book_id
+LEFT JOIN book_authors ON book_authors.book_id = books.id
+LEFT JOIN authors ON authors.id = book_authors.author_id
+WHERE library_books.library_id = $1
+GROUP BY books.id, library_books.added_at, library_books.title_override, library_books.author_override
+ORDER BY library_books.added_at DESC, books.id DESC
+`
+
+type ListBooksRow struct {
+	ID               pgtype.UUID        `json:"id"`
+	Title            string             `json:"title"`
+	Subtitle         pgtype.Text        `json:"subtitle"`
+	CoverID          pgtype.Int8        `json:"cover_id"`
+	FirstPublishYear pgtype.Int4        `json:"first_publish_year"`
+	AddedAt          pgtype.Timestamptz `json:"added_at"`
+	AuthorOverride   pgtype.Text        `json:"author_override"`
+	AuthorNamesList  []string           `json:"author_names_list"`
+	AuthorKeys       []string           `json:"author_keys"`
+}
+
+func (q *Queries) ListBooks(ctx context.Context, libraryID pgtype.UUID) ([]ListBooksRow, error) {
 	rows, err := q.db.Query(ctx, listBooks, libraryID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Book{}
+	items := []ListBooksRow{}
 	for rows.Next() {
-		var i Book
+		var i ListBooksRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
-			&i.Author,
-			&i.CreatedAt,
-			&i.LibraryID,
+			&i.Subtitle,
+			&i.CoverID,
+			&i.FirstPublishYear,
+			&i.AddedAt,
+			&i.AuthorOverride,
+			&i.AuthorNamesList,
+			&i.AuthorKeys,
 		); err != nil {
 			return nil, err
 		}
@@ -67,4 +261,82 @@ func (q *Queries) ListBooks(ctx context.Context, libraryID pgtype.UUID) ([]Book,
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertOpenLibraryAuthor = `-- name: UpsertOpenLibraryAuthor :one
+INSERT INTO authors (open_library_author_key, name)
+VALUES ($1, $2)
+ON CONFLICT (open_library_author_key) DO UPDATE SET name = EXCLUDED.name
+RETURNING id, open_library_author_key, name, bio, birth_date, death_date, metadata_synced_at, works_synced_at, created_at
+`
+
+type UpsertOpenLibraryAuthorParams struct {
+	OpenLibraryAuthorKey pgtype.Text `json:"open_library_author_key"`
+	Name                 string      `json:"name"`
+}
+
+func (q *Queries) UpsertOpenLibraryAuthor(ctx context.Context, arg UpsertOpenLibraryAuthorParams) (Author, error) {
+	row := q.db.QueryRow(ctx, upsertOpenLibraryAuthor, arg.OpenLibraryAuthorKey, arg.Name)
+	var i Author
+	err := row.Scan(
+		&i.ID,
+		&i.OpenLibraryAuthorKey,
+		&i.Name,
+		&i.Bio,
+		&i.BirthDate,
+		&i.DeathDate,
+		&i.MetadataSyncedAt,
+		&i.WorksSyncedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const upsertOpenLibraryBook = `-- name: UpsertOpenLibraryBook :one
+INSERT INTO books (
+    open_library_work_key,
+    title,
+    subtitle,
+    cover_id,
+    first_publish_year,
+    metadata_updated_at
+)
+VALUES ($1, $2, $3, $4, $5, now())
+ON CONFLICT (open_library_work_key) DO UPDATE SET
+    title = EXCLUDED.title,
+    subtitle = EXCLUDED.subtitle,
+    cover_id = COALESCE(EXCLUDED.cover_id, books.cover_id),
+    first_publish_year = COALESCE(EXCLUDED.first_publish_year, books.first_publish_year),
+    metadata_updated_at = now()
+RETURNING id, title, created_at, open_library_work_key, subtitle, cover_id, first_publish_year, metadata_updated_at
+`
+
+type UpsertOpenLibraryBookParams struct {
+	OpenLibraryWorkKey pgtype.Text `json:"open_library_work_key"`
+	Title              string      `json:"title"`
+	Subtitle           pgtype.Text `json:"subtitle"`
+	CoverID            pgtype.Int8 `json:"cover_id"`
+	FirstPublishYear   pgtype.Int4 `json:"first_publish_year"`
+}
+
+func (q *Queries) UpsertOpenLibraryBook(ctx context.Context, arg UpsertOpenLibraryBookParams) (Book, error) {
+	row := q.db.QueryRow(ctx, upsertOpenLibraryBook,
+		arg.OpenLibraryWorkKey,
+		arg.Title,
+		arg.Subtitle,
+		arg.CoverID,
+		arg.FirstPublishYear,
+	)
+	var i Book
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.CreatedAt,
+		&i.OpenLibraryWorkKey,
+		&i.Subtitle,
+		&i.CoverID,
+		&i.FirstPublishYear,
+		&i.MetadataUpdatedAt,
+	)
+	return i, err
 }

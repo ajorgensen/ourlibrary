@@ -1,0 +1,77 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/ajorgensen/ourlibrary/internal/database/store"
+)
+
+templ AuthorPage(user store.User, library *store.Library, author store.Author, books []store.ListBooksByAuthorRow, message string) {
+	@Layout(author.Name + " · Our Library") {
+		<header class="border-b border-base-300 bg-base-100">
+			<div class="navbar mx-auto max-w-6xl px-4 sm:px-6">
+				<div class="flex-1"><a class="btn btn-ghost px-0 text-xl font-bold" href="/">← Our Library</a></div>
+				<span class="hidden text-sm text-base-content/65 sm:inline">{ user.Email }</span>
+			</div>
+		</header>
+		<main class="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+			<div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+				<div class="max-w-2xl">
+					<p class="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">Author</p>
+					<h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{ author.Name }</h1>
+					if author.BirthDate.Valid || author.DeathDate.Valid {
+						<p class="mt-3 text-base-content/60">
+							if author.BirthDate.Valid {
+								<span>{ author.BirthDate.String }</span>
+							}
+							if author.DeathDate.Valid {
+								<span> – { author.DeathDate.String }</span>
+							}
+						</p>
+					}
+					if author.Bio.Valid {
+						<p class="mt-5 whitespace-pre-line text-base-content/75">{ author.Bio.String }</p>
+					}
+				</div>
+				<form method="post" action={ templ.SafeURL("/authors/" + author.OpenLibraryAuthorKey.String + "/refresh") }>
+					<button class="btn btn-primary" type="submit">
+						if author.WorksSyncedAt.Valid {
+							<span>Refresh books</span>
+						} else {
+							<span>Find other books</span>
+						}
+					</button>
+				</form>
+			</div>
+			if message != "" {
+				<div class="alert alert-error mt-8" role="alert">{ message }</div>
+			}
+			<section class="mt-10">
+				<h2 class="mb-4 text-2xl font-bold">Books by { author.Name }</h2>
+				if len(books) == 0 {
+					<div class="rounded-box border border-dashed border-base-300 p-8 text-center text-base-content/60">Find this author’s books from Open Library.</div>
+				} else {
+					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						for _, book := range books {
+							<article class="card relative border border-base-300 bg-base-100 shadow-sm">
+								@BookCover(book.Title, book.CoverID, "/books/" + uuidString(book.ID))
+								<div class="card-body">
+									<h3 class="card-title"><a class="after:absolute after:inset-0" href={ templ.SafeURL("/books/" + uuidString(book.ID)) }>{ book.Title }</a></h3>
+									if book.FirstPublishYear.Valid {
+										<p class="text-sm text-base-content/60">First published { fmt.Sprintf("%d", book.FirstPublishYear.Int32) }</p>
+									}
+									<div class="card-actions mt-auto justify-end">
+										if book.InLibrary {
+											<span class="badge badge-success badge-outline">In your library</span>
+										} else if library != nil {
+											<form class="relative z-10" method="post" action={ templ.SafeURL("/authors/" + author.OpenLibraryAuthorKey.String + "/books/" + uuidString(book.ID)) }><button class="btn btn-primary btn-sm" type="submit">Add to library</button></form>
+										}
+									</div>
+								</div>
+							</article>
+						}
+					</div>
+				}
+			</section>
+		</main>
+	}
+}

@@ -2,7 +2,20 @@ package templates
 
 import "github.com/ajorgensen/ourlibrary/internal/database/store"
 
-templ Home(user store.User, library *store.Library, books []store.Book) {
+type BookForm struct {
+	Title string
+	Author string
+	WorkKey string
+	EditionKey string
+	ISBN string
+	Subtitle string
+	CoverID string
+	FirstPublishYear string
+	AuthorsJSON string
+	LookedUpTitle string
+}
+
+templ Home(user store.User, library *store.Library, books []store.ListBooksRow) {
 	@Layout("Our Library") {
 		<div x-data="{ open: false }" x-on:book-created.window="open = false; $refs.form.reset(); $refs.form.querySelectorAll('input').forEach(input => input.value = ''); $refs.form.querySelector('[data-book-lookup-message]')?.remove(); $dispatch('close-isbn-scanner')">
 			<header class="border-b border-base-300 bg-base-100">
@@ -121,7 +134,7 @@ templ Home(user store.User, library *store.Library, books []store.Book) {
 								</div>
 								<p id="book-lookup-progress" class="htmx-indicator text-sm text-base-content/60" role="status">Looking up book…</p>
 							</div>
-							@BookFields("", "", "", false)
+							@BookFields(BookForm{}, "", false)
 							<div id="form-error" class="text-sm text-error"></div>
 							<div class="card-actions mt-2 justify-end">
 								<button class="btn btn-ghost" type="button" x-on:click="open = false; $dispatch('close-isbn-scanner')">Cancel</button>
@@ -135,7 +148,7 @@ templ Home(user store.User, library *store.Library, books []store.Book) {
 	}
 }
 
-templ BookFields(title string, author string, message string, found bool) {
+templ BookFields(book BookForm, message string, found bool) {
 	<div id="book-fields" class="space-y-4">
 		if message != "" {
 			if found {
@@ -146,16 +159,25 @@ templ BookFields(title string, author string, message string, found bool) {
 		}
 		<label class="form-control">
 			<span class="label-text mb-2 font-medium">Title</span>
-			<input class="input input-bordered w-full" name="title" value={ title } required/>
+			<input class="input input-bordered w-full" name="title" value={ book.Title } required/>
 		</label>
 		<label class="form-control">
 			<span class="label-text mb-2 font-medium">Author</span>
-			<input class="input input-bordered w-full" name="author" value={ author } required/>
+			<input class="input input-bordered w-full" name="author" value={ book.Author } required/>
 		</label>
+		<input type="hidden" name="work_key" value={ book.WorkKey }/>
+		<input type="hidden" name="edition_key" value={ book.EditionKey }/>
+		<input type="hidden" name="lookup_isbn" value={ book.ISBN }/>
+		<input type="hidden" name="subtitle" value={ book.Subtitle }/>
+		<input type="hidden" name="cover_id" value={ book.CoverID }/>
+		<input type="hidden" name="first_publish_year" value={ book.FirstPublishYear }/>
+		<input type="hidden" name="authors_json" value={ book.AuthorsJSON }/>
+		<input type="hidden" name="looked_up_author" value={ book.Author }/>
+		<input type="hidden" name="looked_up_title" value={ book.LookedUpTitle }/>
 	</div>
 }
 
-templ BookList(books []store.Book) {
+templ BookList(books []store.ListBooksRow) {
 	if len(books) == 0 {
 		<div class="rounded-box border border-dashed border-base-300 bg-base-100 p-12 text-center">
 			<h2 class="text-xl font-semibold">The shelves are empty</h2>
@@ -164,10 +186,26 @@ templ BookList(books []store.Book) {
 	} else {
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			for _, book := range books {
-				<article class="card border border-base-300 bg-base-100 shadow-sm">
+				<article class="card relative border border-base-300 bg-base-100 shadow-sm">
+					@BookCover(book.Title, book.CoverID, "/books/" + uuidString(book.ID))
 					<div class="card-body">
-						<h2 class="card-title">{ book.Title }</h2>
-						<p class="text-base-content/65">by { book.Author }</p>
+						<h2 class="card-title"><a class="after:absolute after:inset-0" href={ templ.SafeURL("/books/" + uuidString(book.ID)) }>{ book.Title }</a></h2>
+						<p class="text-base-content/65"><span>by </span>
+							if book.AuthorOverride.Valid {
+								<span>{ book.AuthorOverride.String }</span>
+							} else {
+								for index, name := range book.AuthorNamesList {
+									if index > 0 {
+										<span>, </span>
+									}
+									if index < len(book.AuthorKeys) && book.AuthorKeys[index] != "" {
+										<a class="link link-hover relative z-10" href={ templ.SafeURL("/authors/" + book.AuthorKeys[index]) }>{ name }</a>
+									} else {
+										<span>{ name }</span>
+									}
+								}
+							}
+						</p>
 					</div>
 				</article>
 			}

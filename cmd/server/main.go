@@ -36,7 +36,7 @@ func run(logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,
-		Handler:           web.NewHandler(logger, pool),
+		Handler:           web.NewHandler(logger, pool, cfg.OpenLibraryContact),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 	}
 

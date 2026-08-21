@@ -1,0 +1,72 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/ajorgensen/ourlibrary/internal/database/store"
+)
+
+templ BookPage(user store.User, library *store.Library, book store.GetBookRow) {
+	@Layout(book.Title + " · Our Library") {
+		<header class="border-b border-base-300 bg-base-100">
+			<div class="navbar mx-auto max-w-6xl px-4 sm:px-6">
+				<div class="flex-1"><a class="btn btn-ghost px-0 text-xl font-bold" href="/">← Our Library</a></div>
+				<span class="hidden text-sm text-base-content/65 sm:inline">{ user.Email }</span>
+			</div>
+		</header>
+		<main class="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+			<div class={ bookLayoutClass(book.CoverID.Valid) }>
+				if book.CoverID.Valid {
+					<div>@BookCover(book.Title, book.CoverID, "")</div>
+				}
+				<div>
+					<div class="mb-4 flex flex-wrap items-center gap-2">
+						if book.InLibrary {
+							<span class="badge badge-success badge-outline">In { library.Name }</span>
+						} else {
+							<span class="badge badge-ghost">Discovered book</span>
+						}
+						if book.FirstPublishYear.Valid {
+							<span class="badge badge-ghost">First published { fmt.Sprintf("%d", book.FirstPublishYear.Int32) }</span>
+						}
+					</div>
+					<h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{ book.Title }</h1>
+					if book.Subtitle.Valid {
+						<p class="mt-3 text-xl text-base-content/65">{ book.Subtitle.String }</p>
+					}
+					<p class="mt-5 text-lg text-base-content/75"><span>by </span>
+						if book.AuthorOverride.Valid {
+							<span>{ book.AuthorOverride.String }</span>
+						} else {
+							for index, name := range book.AuthorNames {
+								if index > 0 {
+									<span>, </span>
+								}
+								if index < len(book.AuthorKeys) && book.AuthorKeys[index] != "" {
+									<a class="link link-hover" href={ templ.SafeURL("/authors/" + book.AuthorKeys[index]) }>{ name }</a>
+								} else {
+									<span>{ name }</span>
+								}
+							}
+						}
+					</p>
+					if len(book.Isbns) > 0 {
+						<div class="mt-8">
+							<h2 class="text-sm font-semibold uppercase tracking-widest text-base-content/50">ISBN</h2>
+							<p class="mt-2 text-base-content/75">
+								for index, isbn := range book.Isbns {
+									if index > 0 {
+										<span>, </span>
+									}
+									<span>{ isbn }</span>
+								}
+							</p>
+						</div>
+					}
+					if book.OpenLibraryWorkKey.Valid {
+						<a class="btn btn-outline btn-sm mt-8" href={ templ.SafeURL("https://openlibrary.org/works/" + book.OpenLibraryWorkKey.String) } target="_blank" rel="noreferrer">View on Open Library</a>
+					}
+				</div>
+			</div>
+		</main>
+	}
+}

@@ -20,8 +20,28 @@ var (
 )
 
 type bookMetadata struct {
-	Title  string
-	Author string
+	Title            string
+	Subtitle         string
+	WorkKey          string
+	EditionKey       string
+	ISBN             string
+	CoverID          *int64
+	FirstPublishYear *int32
+	Authors          []authorSummary
+}
+
+type authorSummary struct {
+	Key  string
+	Name string
+}
+
+func (b bookMetadata) authorNames() string {
+	names := make([]string, 0, len(b.Authors))
+	for _, author := range b.Authors {
+		names = append(names, author.Name)
+	}
+
+	return strings.Join(names, ", ")
 }
 
 type bookFinder interface {
@@ -31,12 +51,14 @@ type bookFinder interface {
 type openLibraryBookFinder struct {
 	client    *http.Client
 	searchURL string
+	userAgent string
 }
 
-func newOpenLibraryBookFinder() *openLibraryBookFinder {
+func newOpenLibraryBookFinder(contact string) *openLibraryBookFinder {
 	return &openLibraryBookFinder{
 		client:    &http.Client{Timeout: 8 * time.Second},
 		searchURL: openLibrarySearchURL,
+		userAgent: openLibraryUserAgent(contact),
 	}
 }
 
@@ -53,7 +75,7 @@ func (f *openLibraryBookFinder) Find(ctx context.Context, input string) (bookMet
 
 	query := endpoint.Query()
 	query.Set("isbn", isbn)
-	query.Set("fields", "title,author_name")
+	query.Set("fields", "key,title,subtitle,author_name,author_key,cover_i,first_publish_year,editions,editions.key,editions.isbn")
 	query.Set("limit", "1")
 	endpoint.RawQuery = query.Encode()
 
@@ -61,7 +83,9 @@ func (f *openLibraryBookFinder) Find(ctx context.Context, input string) (bookMet
 	if err != nil {
 		return bookMetadata{}, fmt.Errorf("create Open Library request: %w", err)
 	}
-	req.Header.Set("User-Agent", "OurLibrary/0.1")
+	if f.userAgent != "" {
+		req.Header.Set("User-Agent", f.userAgent)
+	}
 
 	response, err := f.client.Do(req)
 	if err != nil {
@@ -76,8 +100,19 @@ func (f *openLibraryBookFinder) Find(ctx context.Context, input string) (bookMet
 
 	var result struct {
 		Docs []struct {
-			Title   string   `json:"title"`
-			Authors []string `json:"author_name"`
+			Key              string   `json:"key"`
+			Title            string   `json:"title"`
+			Subtitle         string   `json:"subtitle"`
+			AuthorNames      []string `json:"author_name"`
+			AuthorKeys       []string `json:"author_key"`
+			CoverID          *int64   `json:"cover_i"`
+			FirstPublishYear *int32   `json:"first_publish_year"`
+			Editions         struct {
+				Docs []struct {
+					Key  string   `json:"key"`
+					ISBN []string `json:"isbn"`
+				} `json:"docs"`
+			} `json:"editions"`
 		} `json:"docs"`
 	}
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 1<<20))
@@ -89,10 +124,61 @@ func (f *openLibraryBookFinder) Find(ctx context.Context, input string) (bookMet
 		return bookMetadata{}, errBookNotFound
 	}
 
+	doc := result.Docs[0]
+	authors := make([]authorSummary, 0, len(doc.AuthorNames))
+	for index, name := range doc.AuthorNames {
+		key := ""
+		if index < len(doc.AuthorKeys) {
+			key = trimOpenLibraryKey(doc.AuthorKeys[index])
+		}
+		authors = append(authors, authorSummary{Key: key, Name: strings.TrimSpace(name)})
+	}
+
+	editionKey := ""
+	for _, edition := range doc.Editions.Docs {
+		if containsISBN(edition.ISBN, isbn) {
+			editionKey = trimOpenLibraryKey(edition.Key)
+			break
+		}
+	}
+
 	return bookMetadata{
-		Title:  strings.TrimSpace(result.Docs[0].Title),
-		Author: strings.Join(result.Docs[0].Authors, ", "),
+		Title:            strings.TrimSpace(doc.Title),
+		Subtitle:         strings.TrimSpace(doc.Subtitle),
+		WorkKey:          trimOpenLibraryKey(doc.Key),
+		EditionKey:       editionKey,
+		ISBN:             isbn,
+		CoverID:          doc.CoverID,
+		FirstPublishYear: doc.FirstPublishYear,
+		Authors:          authors,
 	}, nil
+}
+
+func containsISBN(values []string, wanted string) bool {
+	for _, value := range values {
+		normalized, err := normalizeISBN(value)
+		if err == nil && normalized == wanted {
+			return true
+		}
+	}
+	return false
+}
+
+func openLibraryUserAgent(contact string) string {
+	contact = strings.TrimSpace(contact)
+	if contact == "" {
+		return "OurLibrary/0.1"
+	}
+
+	return "OurLibrary/0.1 (" + contact + ")"
+}
+
+func trimOpenLibraryKey(key string) string {
+	key = strings.TrimSpace(key)
+	key = strings.TrimPrefix(key, "/works/")
+	key = strings.TrimPrefix(key, "/books/")
+	key = strings.TrimPrefix(key, "/authors/")
+	return key
 }
 
 func normalizeISBN(input string) (string, error) {

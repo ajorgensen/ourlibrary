@@ -8,18 +8,55 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Author struct {
+	ID                   pgtype.UUID        `json:"id"`
+	OpenLibraryAuthorKey pgtype.Text        `json:"open_library_author_key"`
+	Name                 string             `json:"name"`
+	Bio                  pgtype.Text        `json:"bio"`
+	BirthDate            pgtype.Text        `json:"birth_date"`
+	DeathDate            pgtype.Text        `json:"death_date"`
+	MetadataSyncedAt     pgtype.Timestamptz `json:"metadata_synced_at"`
+	WorksSyncedAt        pgtype.Timestamptz `json:"works_synced_at"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+}
+
 type Book struct {
-	ID        pgtype.UUID        `json:"id"`
-	Title     string             `json:"title"`
-	Author    string             `json:"author"`
+	ID                 pgtype.UUID        `json:"id"`
+	Title              string             `json:"title"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	OpenLibraryWorkKey pgtype.Text        `json:"open_library_work_key"`
+	Subtitle           pgtype.Text        `json:"subtitle"`
+	CoverID            pgtype.Int8        `json:"cover_id"`
+	FirstPublishYear   pgtype.Int4        `json:"first_publish_year"`
+	MetadataUpdatedAt  pgtype.Timestamptz `json:"metadata_updated_at"`
+}
+
+type BookAuthor struct {
+	BookID   pgtype.UUID `json:"book_id"`
+	AuthorID pgtype.UUID `json:"author_id"`
+	Position int32       `json:"position"`
+}
+
+type BookIdentifier struct {
+	Kind      string             `json:"kind"`
+	Value     string             `json:"value"`
+	BookID    pgtype.UUID        `json:"book_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	LibraryID pgtype.UUID        `json:"library_id"`
 }
 
 type Library struct {
 	ID        pgtype.UUID        `json:"id"`
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type LibraryBook struct {
+	LibraryID      pgtype.UUID        `json:"library_id"`
+	BookID         pgtype.UUID        `json:"book_id"`
+	AddedByUserID  pgtype.UUID        `json:"added_by_user_id"`
+	TitleOverride  pgtype.Text        `json:"title_override"`
+	AuthorOverride pgtype.Text        `json:"author_override"`
+	AddedAt        pgtype.Timestamptz `json:"added_at"`
 }
 
 type Session struct {

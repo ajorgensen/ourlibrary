@@ -1,0 +1,18 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+templ BookCover(title string, coverID pgtype.Int8, href string) {
+	if coverID.Valid {
+		<figure class="aspect-[3/2] bg-base-200 p-4">
+			if href != "" {
+				<a class="flex h-full w-full items-center justify-center" href={ templ.SafeURL(href) }><img class="h-full w-auto rounded object-contain" src={ fmt.Sprintf("https://covers.openlibrary.org/b/id/%d-M.jpg", coverID.Int64) } alt={ "Cover of " + title } loading="lazy"/></a>
+			} else {
+				<img class="h-full w-auto rounded object-contain" src={ fmt.Sprintf("https://covers.openlibrary.org/b/id/%d-M.jpg", coverID.Int64) } alt={ "Cover of " + title } loading="lazy"/>
+			}
+		</figure>
+	}
+}

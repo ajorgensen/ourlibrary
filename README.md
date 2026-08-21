@@ -31,6 +31,8 @@ Open Air's live-reload proxy at <http://localhost:8090>. The application remains
 
 The defaults use ports `8080` and `55432`. If either port is in use, update `HTTP_ADDRESS`, `POSTGRES_PORT`, and the port in `DATABASE_URL` in `.env`. When you change the application port, also update `proxy.app_port` in `.air.toml`.
 
+Set `OPEN_LIBRARY_CONTACT` to an email address so Open Library can identify API traffic from your deployment.
+
 ## Common commands
 
 ```sh

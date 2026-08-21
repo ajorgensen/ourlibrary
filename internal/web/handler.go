@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -20,18 +21,20 @@ import (
 var staticAssets embed.FS
 
 type handler struct {
-	logger     *slog.Logger
-	pool       *pgxpool.Pool
-	queries    *store.Queries
-	bookFinder bookFinder
+	logger       *slog.Logger
+	pool         *pgxpool.Pool
+	queries      *store.Queries
+	bookFinder   bookFinder
+	authorFinder authorFinder
 }
 
-func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
+func NewHandler(logger *slog.Logger, pool *pgxpool.Pool, openLibraryContact string) http.Handler {
 	h := &handler{
-		logger:     logger,
-		pool:       pool,
-		queries:    store.New(pool),
-		bookFinder: newOpenLibraryBookFinder(),
+		logger:       logger,
+		pool:         pool,
+		queries:      store.New(pool),
+		bookFinder:   newOpenLibraryBookFinder(openLibraryContact),
+		authorFinder: newOpenLibraryAuthorFinder(openLibraryContact),
 	}
 
 	assets, err := fs.Sub(staticAssets, "assets/dist")
@@ -42,7 +45,11 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /{$}", h.requireUser(http.HandlerFunc(h.home)))
 	mux.Handle("GET /books/lookup", h.requireUser(http.HandlerFunc(h.lookupBook)))
+	mux.Handle("GET /books/{bookID}", h.requireUser(http.HandlerFunc(h.showBook)))
 	mux.Handle("POST /books", h.requireUser(http.HandlerFunc(h.createBook)))
+	mux.Handle("GET /authors/{authorKey}", h.requireUser(http.HandlerFunc(h.showAuthor)))
+	mux.Handle("POST /authors/{authorKey}/refresh", h.requireUser(http.HandlerFunc(h.refreshAuthor)))
+	mux.Handle("POST /authors/{authorKey}/books/{bookID}", h.requireUser(http.HandlerFunc(h.addAuthorBook)))
 	mux.HandleFunc("GET /login", h.loginPage)
 	mux.HandleFunc("POST /login", h.login)
 	mux.HandleFunc("POST /logout", h.logout)
@@ -55,23 +62,41 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 func (h *handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 	title := strings.TrimSpace(r.FormValue("title"))
 	author := strings.TrimSpace(r.FormValue("author"))
+	form := templates.BookForm{Title: title, Author: author}
 
 	book, err := h.bookFinder.Find(r.Context(), r.FormValue("isbn"))
 	if errors.Is(err, errInvalidISBN) {
-		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "Enter a valid ISBN-10 or ISBN-13.", false))
+		h.render(w, r, http.StatusOK, templates.BookFields(form, "Enter a valid ISBN-10 or ISBN-13.", false))
 		return
 	}
 	if errors.Is(err, errBookNotFound) {
-		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "No book was found for that ISBN. You can enter the details manually.", false))
+		h.render(w, r, http.StatusOK, templates.BookFields(form, "No book was found for that ISBN. You can enter the details manually.", false))
 		return
 	}
 	if err != nil {
 		h.logger.Error("look up book", "isbn", r.FormValue("isbn"), "error", err)
-		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "Book lookup is unavailable. You can still enter the details manually.", false))
+		h.render(w, r, http.StatusOK, templates.BookFields(form, "Book lookup is unavailable. You can still enter the details manually.", false))
 		return
 	}
 
-	h.render(w, r, http.StatusOK, templates.BookFields(book.Title, book.Author, "Book found. Review or edit the details before adding it.", true))
+	authorsJSON, marshalErr := json.Marshal(book.Authors)
+	if marshalErr != nil {
+		h.serverError(w, r, fmt.Errorf("encode book authors: %w", marshalErr))
+		return
+	}
+	form = templates.BookForm{
+		Title:            book.Title,
+		Author:           book.authorNames(),
+		WorkKey:          book.WorkKey,
+		EditionKey:       book.EditionKey,
+		ISBN:             book.ISBN,
+		Subtitle:         book.Subtitle,
+		CoverID:          formatInt64(book.CoverID),
+		FirstPublishYear: formatInt32(book.FirstPublishYear),
+		AuthorsJSON:      string(authorsJSON),
+		LookedUpTitle:    book.Title,
+	}
+	h.render(w, r, http.StatusOK, templates.BookFields(form, "Book found. Review or edit the details before adding it.", true))
 }
 
 func (h *handler) home(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +144,8 @@ func (h *handler) createBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.queries.CreateBook(r.Context(), store.CreateBookParams{
-		LibraryID: library.ID,
-		Title:     title,
-		Author:    author,
-	})
-	if err != nil {
+	metadata := bookMetadataFromForm(r, title)
+	if err := h.addBook(r.Context(), metadata, title, author, library.ID, user.ID); err != nil {
 		h.serverError(w, r, err)
 		return
 	}
