@@ -11,6 +11,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/ajorgensen/ourlibrary/internal/database/store"
 	"github.com/ajorgensen/ourlibrary/internal/web/templates"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -36,8 +37,11 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", h.home)
-	mux.HandleFunc("POST /books", h.createBook)
+	mux.Handle("GET /{$}", h.requireUser(http.HandlerFunc(h.home)))
+	mux.Handle("POST /books", h.requireUser(http.HandlerFunc(h.createBook)))
+	mux.HandleFunc("GET /login", h.loginPage)
+	mux.HandleFunc("POST /login", h.login)
+	mux.HandleFunc("POST /logout", h.logout)
 	mux.HandleFunc("GET /healthz", h.health)
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServerFS(assets)))
 
@@ -45,13 +49,24 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 }
 
 func (h *handler) home(w http.ResponseWriter, r *http.Request) {
-	books, err := h.queries.ListBooks(r.Context())
+	user := userFromContext(r.Context())
+	library, err := h.primaryLibrary(r, user.ID)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	if library == nil {
+		h.render(w, r, http.StatusOK, templates.Home(user, nil, nil))
+		return
+	}
+
+	books, err := h.queries.ListBooks(r.Context(), library.ID)
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
 
-	h.render(w, r, http.StatusOK, templates.Home(books))
+	h.render(w, r, http.StatusOK, templates.Home(user, library, books))
 }
 
 func (h *handler) createBook(w http.ResponseWriter, r *http.Request) {
@@ -67,16 +82,28 @@ func (h *handler) createBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.queries.CreateBook(r.Context(), store.CreateBookParams{
-		Title:  title,
-		Author: author,
+	user := userFromContext(r.Context())
+	library, err := h.primaryLibrary(r, user.ID)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	if library == nil {
+		h.formError(w, r, "You must belong to a library before you can add books.")
+		return
+	}
+
+	_, err = h.queries.CreateBook(r.Context(), store.CreateBookParams{
+		LibraryID: library.ID,
+		Title:     title,
+		Author:    author,
 	})
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
 
-	books, err := h.queries.ListBooks(r.Context())
+	books, err := h.queries.ListBooks(r.Context(), library.ID)
 	if err != nil {
 		h.serverError(w, r, err)
 		return
@@ -84,6 +111,18 @@ func (h *handler) createBook(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Trigger", "book-created")
 	h.render(w, r, http.StatusCreated, templates.BookList(books))
+}
+
+func (h *handler) primaryLibrary(r *http.Request, userID pgtype.UUID) (*store.Library, error) {
+	libraries, err := h.queries.ListLibrariesForUser(r.Context(), userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(libraries) == 0 {
+		return nil, nil
+	}
+
+	return &libraries[0], nil
 }
 
 func (h *handler) formError(w http.ResponseWriter, r *http.Request, message string) {

@@ -1,12 +1,13 @@
 set dotenv-load := true
 
-export DATABASE_URL := env("DATABASE_URL", "postgres://ourlibrary:ourlibrary@localhost:5432/ourlibrary?sslmode=disable")
+export DATABASE_URL := env("DATABASE_URL", "postgres://ourlibrary:ourlibrary@localhost:55432/ourlibrary?sslmode=disable")
 
 _air_version := "v1.67.4"
 _templ_version := "v0.3.1020"
 _sqlc_version := "v1.31.1"
 _goose_version := "v3.27.3"
 _migrations := "internal/database/migrations"
+_seeds := "internal/database/seeds"
 
 # Show available commands.
 default:
@@ -61,6 +62,14 @@ db-down:
 # Apply all pending migrations.
 migrate:
     goose -dir {{_migrations}} postgres "{{DATABASE_URL}}" up
+
+# Add a user account.
+user-add $email:
+    go run ./cmd/user add "$email"
+
+# Apply the idempotent local-development seeds.
+seed: migrate
+    goose -no-versioning -dir {{_seeds}} postgres "{{DATABASE_URL}}" up
 
 # Roll back the latest migration.
 migrate-down:
