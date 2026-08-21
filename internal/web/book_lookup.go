@@ -48,6 +48,32 @@ type bookFinder interface {
 	Find(context.Context, string) (bookMetadata, error)
 }
 
+type bookMetadataCache interface {
+	FindByISBN(context.Context, string) (bookMetadata, error)
+}
+
+type localFirstBookFinder struct {
+	cache    bookMetadataCache
+	upstream bookFinder
+}
+
+func (f *localFirstBookFinder) Find(ctx context.Context, input string) (bookMetadata, error) {
+	isbn, err := normalizeISBN(input)
+	if err != nil {
+		return bookMetadata{}, err
+	}
+
+	book, err := f.cache.FindByISBN(ctx, isbn)
+	if err == nil {
+		return book, nil
+	}
+	if !errors.Is(err, errBookNotFound) {
+		return bookMetadata{}, fmt.Errorf("look up cached book: %w", err)
+	}
+
+	return f.upstream.Find(ctx, isbn)
+}
+
 type openLibraryBookFinder struct {
 	client    *http.Client
 	searchURL string

@@ -29,11 +29,15 @@ type handler struct {
 }
 
 func NewHandler(logger *slog.Logger, pool *pgxpool.Pool, openLibraryContact string) http.Handler {
+	queries := store.New(pool)
 	h := &handler{
-		logger:       logger,
-		pool:         pool,
-		queries:      store.New(pool),
-		bookFinder:   newOpenLibraryBookFinder(openLibraryContact),
+		logger:  logger,
+		pool:    pool,
+		queries: queries,
+		bookFinder: &localFirstBookFinder{
+			cache:    &databaseBookMetadataCache{queries: queries},
+			upstream: newOpenLibraryBookFinder(openLibraryContact),
+		},
 		authorFinder: newOpenLibraryAuthorFinder(openLibraryContact),
 	}
 

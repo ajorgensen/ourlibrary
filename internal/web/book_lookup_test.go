@@ -87,6 +87,98 @@ func TestOpenLibraryBookFinderReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestLocalFirstBookFinderReturnsCachedBookWithoutUpstreamRequest(t *testing.T) {
+	wanted := bookMetadata{Title: "Fantastic Mr Fox", ISBN: "9780140328721"}
+	upstreamCalled := false
+	finder := &localFirstBookFinder{
+		cache: bookMetadataCacheFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			if isbn != "9780140328721" {
+				t.Errorf("cache ISBN = %q, want normalized ISBN", isbn)
+			}
+			return wanted, nil
+		}),
+		upstream: bookFinderFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			upstreamCalled = true
+			return bookMetadata{}, nil
+		}),
+	}
+
+	book, err := finder.Find(context.Background(), "978-0-14-032872-1")
+	if err != nil {
+		t.Fatalf("Find() error = %v", err)
+	}
+	if book.Title != wanted.Title {
+		t.Errorf("Find() = %#v, want cached metadata", book)
+	}
+	if upstreamCalled {
+		t.Error("Find() called upstream after a cache hit")
+	}
+}
+
+func TestLocalFirstBookFinderFallsThroughOnCacheMiss(t *testing.T) {
+	finder := &localFirstBookFinder{
+		cache: bookMetadataCacheFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			return bookMetadata{}, errBookNotFound
+		}),
+		upstream: bookFinderFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			return bookMetadata{Title: "Fantastic Mr Fox", ISBN: isbn}, nil
+		}),
+	}
+
+	book, err := finder.Find(context.Background(), "9780140328721")
+	if err != nil {
+		t.Fatalf("Find() error = %v", err)
+	}
+	if book.Title != "Fantastic Mr Fox" {
+		t.Errorf("Find() = %#v, want upstream metadata", book)
+	}
+}
+
+func TestLocalFirstBookFinderReturnsCacheFailure(t *testing.T) {
+	wanted := errors.New("database unavailable")
+	upstreamCalled := false
+	finder := &localFirstBookFinder{
+		cache: bookMetadataCacheFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			return bookMetadata{}, wanted
+		}),
+		upstream: bookFinderFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			upstreamCalled = true
+			return bookMetadata{}, nil
+		}),
+	}
+
+	_, err := finder.Find(context.Background(), "9780140328721")
+	if !errors.Is(err, wanted) {
+		t.Fatalf("Find() error = %v, want cache failure", err)
+	}
+	if upstreamCalled {
+		t.Error("Find() hid a cache failure behind an upstream request")
+	}
+}
+
+func TestLocalFirstBookFinderRejectsInvalidISBNBeforeDependencies(t *testing.T) {
+	cacheCalled := false
+	upstreamCalled := false
+	finder := &localFirstBookFinder{
+		cache: bookMetadataCacheFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			cacheCalled = true
+			return bookMetadata{}, nil
+		}),
+		upstream: bookFinderFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
+			upstreamCalled = true
+			return bookMetadata{}, nil
+		}),
+	}
+
+	_, err := finder.Find(context.Background(), "not-an-isbn")
+	if !errors.Is(err, errInvalidISBN) {
+		t.Fatalf("Find() error = %v, want invalid ISBN", err)
+	}
+	if cacheCalled || upstreamCalled {
+		t.Error("Find() called a dependency for invalid input")
+	}
+}
+
 func TestLookupBookFillsEditableFields(t *testing.T) {
 	h := lookupTestHandler(bookFinderFunc(func(ctx context.Context, isbn string) (bookMetadata, error) {
 		return bookMetadata{
@@ -145,6 +237,12 @@ func TestLookupBookPreservesManualFieldsWhenLookupFails(t *testing.T) {
 type bookFinderFunc func(context.Context, string) (bookMetadata, error)
 
 func (f bookFinderFunc) Find(ctx context.Context, isbn string) (bookMetadata, error) {
+	return f(ctx, isbn)
+}
+
+type bookMetadataCacheFunc func(context.Context, string) (bookMetadata, error)
+
+func (f bookMetadataCacheFunc) FindByISBN(ctx context.Context, isbn string) (bookMetadata, error) {
 	return f(ctx, isbn)
 }
 

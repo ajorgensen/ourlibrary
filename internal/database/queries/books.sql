@@ -62,6 +62,44 @@ LEFT JOIN library_books
    AND library_books.library_id = $2
 WHERE books.id = $1;
 
+-- name: FindBookMetadataByISBN :one
+SELECT
+    books.title,
+    books.subtitle,
+    books.cover_id,
+    books.first_publish_year,
+    books.open_library_work_key,
+    COALESCE(
+        (SELECT min(edition_identifiers.value)
+         FROM book_identifiers AS edition_identifiers
+         WHERE edition_identifiers.book_id = books.id
+           AND edition_identifiers.kind = 'open_library_edition'
+         HAVING count(*) = 1
+            AND (SELECT count(*)
+                 FROM book_identifiers AS isbn_identifiers
+                 WHERE isbn_identifiers.book_id = books.id
+                   AND isbn_identifiers.kind = 'isbn') = 1),
+        ''
+    )::text AS open_library_edition_key,
+    COALESCE(
+        (SELECT array_agg(authors.name ORDER BY book_authors.position, authors.id)
+         FROM book_authors
+         JOIN authors ON authors.id = book_authors.author_id
+         WHERE book_authors.book_id = books.id),
+        ARRAY[]::text[]
+    )::text[] AS author_names,
+    COALESCE(
+        (SELECT array_agg(COALESCE(authors.open_library_author_key, '') ORDER BY book_authors.position, authors.id)
+         FROM book_authors
+         JOIN authors ON authors.id = book_authors.author_id
+         WHERE book_authors.book_id = books.id),
+        ARRAY[]::text[]
+    )::text[] AS author_keys
+FROM book_identifiers
+JOIN books ON books.id = book_identifiers.book_id
+WHERE book_identifiers.kind = 'isbn'
+  AND book_identifiers.value = $1;
+
 -- name: CreateManualBook :one
 INSERT INTO books (title)
 VALUES ($1)
