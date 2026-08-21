@@ -1,0 +1,51 @@
+root = "."
+tmp_dir = "tmp"
+env_files = [".env"]
+
+[build]
+cmd = "go build -o ./tmp/ourlibrary ./cmd/server"
+entrypoint = ["./tmp/ourlibrary"]
+include_ext = ["go", "css", "js"]
+exclude_dir = ["internal/web/assets/src", "node_modules", "tmp"]
+exclude_regex = ["_test\\.go"]
+exclude_unchanged = true
+delay = 200
+stop_on_error = true
+send_interrupt = true
+kill_delay = "500ms"
+
+[[build.rules]]
+name = "templ"
+include_ext = ["templ"]
+cmd = "templ generate"
+delay = 100
+
+[[build.rules]]
+name = "css"
+include_dir = ["internal/web/assets/src"]
+include_ext = ["css"]
+cmd = "npm run build:css"
+delay = 100
+
+[[build.rules]]
+name = "sqlc"
+include_dir = ["internal/database/migrations", "internal/database/queries"]
+include_ext = ["sql"]
+cmd = "sqlc generate"
+delay = 100
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = true
+keep_scroll = true
+
+[proxy]
+enabled = true
+proxy_port = 8090
+app_port = 8080
+app_start_timeout = 10000
