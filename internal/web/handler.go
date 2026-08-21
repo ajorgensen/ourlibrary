@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -19,16 +20,18 @@ import (
 var staticAssets embed.FS
 
 type handler struct {
-	logger  *slog.Logger
-	pool    *pgxpool.Pool
-	queries *store.Queries
+	logger     *slog.Logger
+	pool       *pgxpool.Pool
+	queries    *store.Queries
+	bookFinder bookFinder
 }
 
 func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	h := &handler{
-		logger:  logger,
-		pool:    pool,
-		queries: store.New(pool),
+		logger:     logger,
+		pool:       pool,
+		queries:    store.New(pool),
+		bookFinder: newOpenLibraryBookFinder(),
 	}
 
 	assets, err := fs.Sub(staticAssets, "assets/dist")
@@ -38,6 +41,7 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /{$}", h.requireUser(http.HandlerFunc(h.home)))
+	mux.Handle("GET /books/lookup", h.requireUser(http.HandlerFunc(h.lookupBook)))
 	mux.Handle("POST /books", h.requireUser(http.HandlerFunc(h.createBook)))
 	mux.HandleFunc("GET /login", h.loginPage)
 	mux.HandleFunc("POST /login", h.login)
@@ -46,6 +50,28 @@ func NewHandler(logger *slog.Logger, pool *pgxpool.Pool) http.Handler {
 	mux.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServerFS(assets)))
 
 	return h.recoverPanics(mux)
+}
+
+func (h *handler) lookupBook(w http.ResponseWriter, r *http.Request) {
+	title := strings.TrimSpace(r.FormValue("title"))
+	author := strings.TrimSpace(r.FormValue("author"))
+
+	book, err := h.bookFinder.Find(r.Context(), r.FormValue("isbn"))
+	if errors.Is(err, errInvalidISBN) {
+		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "Enter a valid ISBN-10 or ISBN-13.", false))
+		return
+	}
+	if errors.Is(err, errBookNotFound) {
+		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "No book was found for that ISBN. You can enter the details manually.", false))
+		return
+	}
+	if err != nil {
+		h.logger.Error("look up book", "isbn", r.FormValue("isbn"), "error", err)
+		h.render(w, r, http.StatusOK, templates.BookFields(title, author, "Book lookup is unavailable. You can still enter the details manually.", false))
+		return
+	}
+
+	h.render(w, r, http.StatusOK, templates.BookFields(book.Title, book.Author, "Book found. Review or edit the details before adding it.", true))
 }
 
 func (h *handler) home(w http.ResponseWriter, r *http.Request) {

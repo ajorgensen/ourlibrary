@@ -210,6 +210,7 @@
         this.detectionMethod = method;
         this.status = `Detected ${isbn} from ${method}.`;
         this.stop(false);
+        this.$dispatch("isbn-detected", { isbn });
       },
 
       fail(message) {
