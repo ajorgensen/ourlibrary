@@ -43,7 +43,7 @@ func Home(user store.User, library *store.Library, books []store.Book) templ.Com
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: false }\" x-on:book-created.window=\"open = false; $refs.form.reset()\"><header class=\"border-b border-base-300 bg-base-100\"><div class=\"navbar mx-auto max-w-6xl px-4 sm:px-6\"><div class=\"flex-1\"><a class=\"text-xl font-bold\" href=\"/\">Our Library</a></div><div class=\"flex items-center gap-3\"><span class=\"hidden text-sm text-base-content/65 sm:inline\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div x-data=\"{ open: false }\" x-on:book-created.window=\"open = false; $refs.form.reset(); $dispatch('close-isbn-scanner')\"><header class=\"border-b border-base-300 bg-base-100\"><div class=\"navbar mx-auto max-w-6xl px-4 sm:px-6\"><div class=\"flex-1\"><a class=\"text-xl font-bold\" href=\"/\">Our Library</a></div><div class=\"flex items-center gap-3\"><span class=\"hidden text-sm text-base-content/65 sm:inline\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -107,7 +107,7 @@ func Home(user store.User, library *store.Library, books []store.Book) templ.Com
 				return templ_7745c5c3_Err
 			}
 			if library != nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div x-cloak x-show=\"open\" x-on:keydown.escape.window=\"open = false\" class=\"fixed inset-0 z-50 flex items-center justify-center p-4\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"add-book-title\"><button class=\"absolute inset-0 bg-neutral/60\" type=\"button\" aria-label=\"Close\" x-on:click=\"open = false\"></button><div class=\"card z-10 w-full max-w-lg bg-base-100 shadow-2xl\"><form x-ref=\"form\" class=\"card-body\" hx-post=\"/books\" hx-target=\"#book-list\" hx-swap=\"innerHTML\"><h2 id=\"add-book-title\" class=\"card-title text-2xl\">Add a book</h2><label class=\"form-control\"><span class=\"label-text mb-2 font-medium\">Title</span> <input class=\"input input-bordered w-full\" name=\"title\" required autofocus></label> <label class=\"form-control\"><span class=\"label-text mb-2 font-medium\">Author</span> <input class=\"input input-bordered w-full\" name=\"author\" required></label><div id=\"form-error\" class=\"text-sm text-error\"></div><div class=\"card-actions mt-2 justify-end\"><button class=\"btn btn-ghost\" type=\"button\" x-on:click=\"open = false\">Cancel</button> <button class=\"btn btn-primary\" type=\"submit\">Add book</button></div></form></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div x-cloak x-show=\"open\" x-on:keydown.escape.window=\"open = false; $dispatch('close-isbn-scanner')\" class=\"fixed inset-0 z-50 flex items-center justify-center p-4\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"add-book-title\"><button class=\"absolute inset-0 bg-neutral/60\" type=\"button\" aria-label=\"Close\" x-on:click=\"open = false; $dispatch('close-isbn-scanner')\"></button><div class=\"card z-10 w-full max-w-lg bg-base-100 shadow-2xl\"><form x-ref=\"form\" class=\"card-body\" hx-post=\"/books\" hx-target=\"#book-list\" hx-swap=\"innerHTML\"><h2 id=\"add-book-title\" class=\"card-title text-2xl\">Add a book</h2><div x-cloak x-show=\"cameraAvailable\" class=\"space-y-3\" x-data=\"isbnScanner()\" x-on:close-isbn-scanner.window=\"close()\"><div class=\"flex items-center justify-between gap-3\"><div><h3 class=\"font-semibold\">Scan ISBN</h3><p class=\"text-sm text-base-content/60\">Use a barcode or printed ISBN.</p></div><button class=\"btn btn-secondary btn-sm\" type=\"button\" x-show=\"!active\" x-on:click=\"start()\" x-text=\"detectedISBN || error ? 'Scan again' : 'Open camera'\"></button> <button class=\"btn btn-ghost btn-sm\" type=\"button\" x-show=\"active\" x-on:click=\"stop()\">Stop</button></div><div x-cloak x-show=\"active\" class=\"relative aspect-video overflow-hidden rounded-box bg-neutral\"><video x-ref=\"video\" class=\"h-full w-full object-cover\" autoplay muted playsinline></video><div class=\"pointer-events-none absolute inset-x-[5%] top-[26%] h-[48%] rounded-lg border-2 border-white shadow-[0_0_0_999px_rgba(0,0,0,0.35)]\"></div></div><canvas x-ref=\"canvas\" class=\"hidden\"></canvas><p class=\"text-sm text-base-content/70\" aria-live=\"polite\" x-text=\"status\"></p><div x-cloak x-show=\"detectedISBN\" class=\"alert alert-success py-3\" role=\"status\"><div><p class=\"font-semibold\" x-text=\"detectedISBN\"></p><p class=\"text-xs\" x-text=\"`Detected from ${detectionMethod}`\"></p></div></div><p x-cloak x-show=\"error\" class=\"text-sm text-error\" role=\"alert\" x-text=\"error\"></p><details x-cloak x-show=\"lastOCRText\" class=\"text-xs text-base-content/60\"><summary>Last text recognized</summary><pre class=\"mt-1 whitespace-pre-wrap\" x-text=\"lastOCRText\"></pre></details><div class=\"divider my-0\">or enter details</div></div><label class=\"form-control\"><span class=\"label-text mb-2 font-medium\">Title</span> <input class=\"input input-bordered w-full\" name=\"title\" required></label> <label class=\"form-control\"><span class=\"label-text mb-2 font-medium\">Author</span> <input class=\"input input-bordered w-full\" name=\"author\" required></label><div id=\"form-error\" class=\"text-sm text-error\"></div><div class=\"card-actions mt-2 justify-end\"><button class=\"btn btn-ghost\" type=\"button\" x-on:click=\"open = false; $dispatch('close-isbn-scanner')\">Cancel</button> <button class=\"btn btn-primary\" type=\"submit\">Add book</button></div></form></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -165,7 +165,7 @@ func BookList(books []store.Book) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(book.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 94, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 134, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -178,7 +178,7 @@ func BookList(books []store.Book) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(book.Author)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 95, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 135, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -226,7 +226,7 @@ func FormError(message string) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 104, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/home.templ`, Line: 144, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {

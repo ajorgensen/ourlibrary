@@ -35,6 +35,7 @@ fmt:
 
 # Run all tests and static checks.
 check: generate
+    npm run test:js
     go test ./...
     go vet ./...
 

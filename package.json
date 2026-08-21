@@ -2,16 +2,21 @@
   "name": "ourlibrary",
   "private": true,
   "scripts": {
-    "build": "npm run build:css && npm run build:vendor",
+    "build": "npm run build:css && npm run build:js && npm run build:vendor",
     "build:css": "tailwindcss -i internal/web/assets/src/app.css -o internal/web/assets/dist/app.css --minify",
-    "build:vendor": "cp node_modules/htmx.org/dist/htmx.min.js internal/web/assets/dist/htmx.min.js && cp node_modules/alpinejs/dist/cdn.min.js internal/web/assets/dist/alpine.min.js",
-    "dev:css": "tailwindcss -i internal/web/assets/src/app.css -o internal/web/assets/dist/app.css --watch"
+    "build:js": "cp internal/web/assets/src/isbn-scanner.js internal/web/assets/dist/isbn-scanner.js",
+    "build:vendor": "cp node_modules/htmx.org/dist/htmx.min.js internal/web/assets/dist/htmx.min.js && cp node_modules/alpinejs/dist/cdn.min.js internal/web/assets/dist/alpine.min.js && cp node_modules/@zxing/browser/umd/zxing-browser.min.js internal/web/assets/dist/zxing-browser.min.js && cp node_modules/tesseract.js/dist/tesseract.min.js internal/web/assets/dist/tesseract.min.js && cp node_modules/tesseract.js/dist/worker.min.js internal/web/assets/dist/tesseract-worker.min.js",
+    "dev:css": "tailwindcss -i internal/web/assets/src/app.css -o internal/web/assets/dist/app.css --watch",
+    "test:js": "node --test internal/web/assets/src/*.test.js"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "alpinejs": "^3.14.9",
     "daisyui": "^5.0.0",
     "htmx.org": "^2.0.4",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.0"
