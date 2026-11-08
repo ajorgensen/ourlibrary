@@ -32,7 +32,6 @@ tasks:
     with:
       repository: https://github.com/ajorgensen/ourlibrary.git
       ref: ${{ init.commit-sha }}
-      github-token: ${{ github.token }}
 
   - key: test
     use: code
