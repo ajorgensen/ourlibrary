@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set +x
+set -euo pipefail
+
+commit_sha=${COMMIT_SHA:-$(git rev-parse HEAD)}
+[[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid commit SHA' >&2; exit 1; }
+
+ssh_options=(-F /dev/null -T -o BatchMode=yes -o ConnectTimeout=30)
+if [[ -n "${SSH_PRIVATE_KEY:-}" ]]; then
+  [[ "${SSH_HOST:-}" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo 'Invalid SSH host' >&2; exit 1; }
+  : "${SSH_KNOWN_HOSTS:?Missing pinned host key}"
+  umask 077
+  secret_dir=$(mktemp -d)
+  trap 'rm -rf "$secret_dir"' EXIT
+  printf '%s\n' "$SSH_PRIVATE_KEY" > "$secret_dir/key"
+  printf '%s\n' "$SSH_KNOWN_HOSTS" > "$secret_dir/known_hosts"
+  unset SSH_PRIVATE_KEY SSH_KNOWN_HOSTS
+  ssh_options+=(-i "$secret_dir/key" -o IdentitiesOnly=yes -o IdentityAgent=none
+    -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$secret_dir/known_hosts")
+  deploy_target="deploy@$SSH_HOST"
+else
+  deploy_target=${DEPLOY_TARGET:-ajorgensen@143.198.28.134}
+  [[ "$deploy_target" =~ ^[A-Za-z0-9._@:-]+$ ]] || { echo 'Invalid DEPLOY_TARGET' >&2; exit 1; }
+fi
+
+# HQ provisions the Compose file and runtime secrets. This repo releases the image.
+# shellcheck disable=SC2029
+ssh "${ssh_options[@]}" "$deploy_target" \
+  "sudo env LIBRARY_IMAGE_TAG=$commit_sha docker compose -f /opt/apps/library/compose.yaml pull && sudo env LIBRARY_IMAGE_TAG=$commit_sha docker compose -f /opt/apps/library/compose.yaml run --rm --no-deps --entrypoint migrate library && sudo env LIBRARY_IMAGE_TAG=$commit_sha docker compose -f /opt/apps/library/compose.yaml up -d --pull always --wait --wait-timeout 60"

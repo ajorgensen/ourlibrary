@@ -83,3 +83,7 @@ migrate-status:
 # Create a new SQL migration.
 new-migration name:
     goose -dir {{_migrations}} create "{{name}}" sql
+
+# Deploy a published image of the current commit to production.
+deploy:
+    ./scripts/deploy

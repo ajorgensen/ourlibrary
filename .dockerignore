@@ -1,0 +1,7 @@
+.git
+.docs
+.rwx
+node_modules
+bin
+tmp
+.env
