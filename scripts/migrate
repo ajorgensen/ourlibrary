@@ -1,4 +1,0 @@
-#!/bin/sh
-set -eu
-: "${DATABASE_URL:?DATABASE_URL must be set}"
-exec goose -dir /migrations postgres "$DATABASE_URL" up
